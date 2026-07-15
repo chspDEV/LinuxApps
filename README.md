@@ -1,30 +1,22 @@
-# 🐧 LinuxApps - Ricing & Utilities Suite
+# Linux Apps 🐧
 
-Bem-vindo ao **LinuxApps**, um repositório pessoal dedicado ao estudo e desenvolvimento de aplicativos úteis e extremamente customizados para o dia a dia no ecossistema Linux. 
+Hi there! This is a personal repository where I share small, useful apps that I build for my day-to-day use on Linux.
 
-Este projeto foi construído inteiramente utilizando o **Antigravity IDE** como assistente inteligente de programação (Pair Programming com IA).
+I use Linux Mint and Zorin OS as my daily drivers, so everything here is built and tested with those distros in mind. I'm mainly using this space to learn, practice, and keep my desktop environment looking exactly the way I like it (I'm a big fan of custom ricing, frameless windows, and retro/cyberpunk aesthetics).
 
-## 🎯 Objetivo
+## Current Apps
 
-A ideia principal deste repositório é criar pequenas ferramentas de *desktop* com alto apelo visual (focadas na estética de *Ricing* e *Cyberpunk/Retro*), mas sem perder a utilidade. O código e as práticas foram pensados e otimizados especialmente para funcionar de forma nativa e fluida nas distribuições:
-- **Linux Mint**
-- **Zorin OS**
+Right now, this repository contains a few tools I've built using **Electron, React, and Vite**:
 
-## 📦 Aplicativos Atuais
+### 1. RetroPlayer
+A frameless music player that lets me search and download songs from YouTube straight from the interface. It pulls the original thumbnail from the video and serves as a stylish, draggable desktop widget.
 
-Até o momento, a suíte conta com os seguintes utilitários construídos sobre **Electron + React + Vite**:
+### 2. FormatConverter
+A simple, drag-and-drop file converter. It runs FFmpeg in the background to asynchronously convert videos, audio files, and images into different formats without needing to open the terminal every time.
 
-### 1. RetroPlayer 🎵
-Um player de música frameless (sem bordas), arrastável, que permite buscar e fazer download de músicas do YouTube diretamente pela interface. Ele extrai automaticamente a arte de capa (thumbnail) original do vídeo, servindo como um widget estiloso para a área de trabalho.
+## Tech Stack & Notes
+- Built with Electron, React, TypeScript, and Vite.
+- Custom CSS titlebars (`-webkit-app-region: drag`) and vaporwave/neon palettes.
+- All my trial-and-error notes (like dealing with Electron's strict security policies and local file paths) are documented inside the `Skills/` folder for future reference.
 
-### 2. CyberConvert (Format Converter) 💽
-Um conversor universal de arquivos em lote (`Drag & Drop`). Rodando o poder bruto do **FFmpeg** nativo do sistema em segundo plano, ele permite a conversão assíncrona de Vídeos, Áudios e Imagens com apenas um clique e sem complicações.
-
-## 🛠️ Tecnologias & Lições Aprendidas
-- **Stack Base:** Electron, React, TypeScript, Vite.
-- **Ricing Estético:** Uso intensivo de CSS para emular barras de título do Windows 95 e terminais UNIX (`-webkit-app-region: drag`), paletas de cores vaporwave/neon e fontes pixeladas nativas da comunidade (como `VT323`).
-- **Engenharia:** O aprendizado contínuo (arquitetado na pasta `Skills`) foi essencial para superar os rígidos bloqueios do Chromium (`contextIsolation`, limitações do HTML5 File API para drag&drop) e criar streams de mídia limpos injetando protocolos customizados (`asset://`).
-
----
-
-> *"Para quem gosta de ter controle absoluto sobre sua máquina e de exibir um desktop impecável."*
+Feel free to poke around the code or use these apps if you find them helpful!
