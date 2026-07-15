@@ -1,0 +1,52 @@
+@import 'nes.css/css/nes.min.css';
+
+body {
+  background-color: #212529; /* Dark mode retro bg */
+  color: #fff;
+  font-family: 'Press Start 2P', cursive;
+  margin: 0;
+  padding: 20px;
+  -webkit-font-smoothing: none;
+  user-select: none;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+  max-width: 800px;
+  margin: 0 auto;
+  gap: 20px;
+}
+
+/* NES.css dark mode overrides */
+.nes-container.is-dark {
+  background-color: #212529;
+  border-image-slice: 2;
+  border-image-width: 2;
+  border-image-repeat: stretch;
+  border-image-source: url('data:image/svg+xml;utf8,<?xml version="1.0" encoding="UTF-8" ?><svg version="1.1" width="5" height="5" xmlns="http://www.w3.org/2000/svg"><path d="M2 1 h1 v1 h-1 z M1 2 h1 v1 h-1 z M3 2 h1 v1 h-1 z M2 3 h1 v1 h-1 z" fill="rgb(255,255,255)" /></svg>');
+  border-image-outset: 2;
+  border-style: solid;
+}
+
+.nes-text.is-primary { color: #209cee; }
+.nes-text.is-success { color: #92cc41; }
+.nes-text.is-warning { color: #f7d51d; }
+.nes-text.is-error { color: #e76e55; }
+
+/* Custom Scrollbar for retro feel */
+::-webkit-scrollbar {
+  width: 12px;
+}
+::-webkit-scrollbar-track {
+  background: #000;
+  border-left: 2px solid #fff;
+}
+::-webkit-scrollbar-thumb {
+  background: #fff;
+}
+
+h1, h2, h3 {
+  margin-bottom: 20px;
+  color: #f7d51d; /* Retro Yellow */
+}
