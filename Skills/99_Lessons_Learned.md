@@ -13,6 +13,8 @@ Este documento serve como a base de treinamento e feedback para a Inteligência 
   - **Correção (Padrão Ouro):** A IA deve registrar um protocolo customizado no backend. No entanto, é **crucial** registrar privilégios de *streaming* (usando `protocol.registerSchemesAsPrivileged([{ scheme: 'asset', privileges: { stream: true, bypassCSP: true } }])`) ANTES do app estar pronto. Só assim o elemento `<audio>` vai conseguir tocar a mídia via `net.fetch(pathToFileURL(filePath).toString())`.
 - **Content Security Policy (CSP):** O HTML base do Electron-Vite (`index.html`) vem com uma tag `<meta http-equiv="Content-Security-Policy">` super restritiva. Mesmo criando o protocolo customizado, o navegador vai bloquear a imagem e o som.
   - **Correção:** Sempre lembrar de adicionar permissão explícita para o protocolo (`asset:`) nas diretivas `img-src` e `media-src` do HTML base.
+- **Drag & Drop e Caminhos de Arquivo (File Path):** Nas versões mais recentes do Electron (com `contextIsolation` ativado), o HTML5 File API (como o `e.dataTransfer.files`) esconde a propriedade `.path` por questões de segurança. Tentar ler `file.path` no frontend retornará `undefined`.
+  - **Correção:** Expor o método nativo `webUtils.getPathForFile(file)` do Electron através do `preload.js` e consumi-tr no frontend.
 
 ---
 
