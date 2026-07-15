@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, protocol, net } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -6,8 +6,11 @@ import icon from '../../resources/icon.png?asset'
 function createWindow(): void {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
-    width: 900,
-    height: 670,
+    width: 380,
+    height: 600,
+    frame: false,
+    resizable: false,
+    transparent: true,
     show: false,
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
@@ -43,7 +46,17 @@ import fs from 'fs'
 import os from 'os'
 import ytdlp from 'yt-dlp-exec'
 
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'asset', privileges: { secure: true, standard: true, supportFetchAPI: true, stream: true, bypassCSP: true } }
+])
+
 app.whenReady().then(() => {
+  // Use registerFileProtocol instead of net.fetch to support Range requests for <audio> elements
+  protocol.registerFileProtocol('asset', (request, callback) => {
+    const filePath = decodeURIComponent(request.url.slice('asset://'.length))
+    callback({ path: filePath })
+  })
+
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
 
@@ -54,6 +67,19 @@ app.whenReady().then(() => {
 
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
+
+  // Window Controls
+  ipcMain.on('window-minimize', (event) => {
+    const webContents = event.sender
+    const win = BrowserWindow.fromWebContents(webContents)
+    win?.minimize()
+  })
+
+  ipcMain.on('window-close', (event) => {
+    const webContents = event.sender
+    const win = BrowserWindow.fromWebContents(webContents)
+    win?.close()
+  })
 
   // Handle Download Audio
   ipcMain.handle('download-audio', async (_event, urlOrSearch) => {
@@ -75,6 +101,7 @@ app.whenReady().then(() => {
         audioFormat: 'mp3',
         audioQuality: 0,
         output: `${downloadDir}/%(title)s.%(ext)s`,
+        writeThumbnail: true,
         noCheckCertificates: true,
         noWarnings: true,
         preferFreeFormats: true
@@ -98,10 +125,19 @@ app.whenReady().then(() => {
       const files = fs.readdirSync(downloadDir)
       // Filter for audio files
       const audioFiles = files.filter(f => f.endsWith('.mp3') || f.endsWith('.m4a'))
-      return audioFiles.map(file => ({
-        name: file,
-        path: join(downloadDir, file)
-      }))
+      return audioFiles.map(file => {
+        const base = file.substring(0, file.lastIndexOf('.'))
+        let coverPath = undefined
+        if (fs.existsSync(join(downloadDir, `${base}.webp`))) coverPath = join(downloadDir, `${base}.webp`)
+        else if (fs.existsSync(join(downloadDir, `${base}.jpg`))) coverPath = join(downloadDir, `${base}.jpg`)
+        else if (fs.existsSync(join(downloadDir, `${base}.png`))) coverPath = join(downloadDir, `${base}.png`)
+
+        return {
+          name: file,
+          path: join(downloadDir, file),
+          cover: coverPath
+        }
+      })
     } catch (error) {
       console.error('List audio failed:', error)
       return []
