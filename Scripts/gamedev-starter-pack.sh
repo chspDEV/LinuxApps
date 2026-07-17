@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================
-#  Game Dev Starter Pack — Ubuntu 26.04 LTS
+#  GAME DEV STARTER PACK
 #  Unity Hub | Antigravity IDE | Rider | Git | GitHub Desktop Plus
 # ============================================================
 
@@ -19,15 +19,15 @@ C_YELLOW="\033[33m"
 C_RED="\033[31m"
 C_BLUE="\033[34m"
 
-TOTAL_STEPS=10
+TOTAL_STEPS=11
 CURRENT_STEP=0
 
-# ---------- utilidades visuais ----------
+# ---------- utilidades visuais (somente ASCII) ----------
 term_width() { tput cols 2>/dev/null || echo 60; }
 
 hr() {
   local w; w=$(term_width)
-  printf "${C_DIM}%${w}s${C_RESET}\n" | tr ' ' '─'
+  printf "${C_DIM}%${w}s${C_RESET}\n" | tr ' ' '-'
 }
 
 banner() {
@@ -40,7 +40,7 @@ banner() {
   hr
   printf "%${pad}s %s\n" "" "$title"
   hr
-  echo -e "${C_RESET}${C_DIM}Unity Hub · Antigravity IDE · Rider · Git · GitHub Desktop Plus${C_RESET}\n"
+  echo -e "${C_RESET}${C_DIM}Unity Hub | Antigravity IDE | Rider | Git | GitHub Desktop Plus${C_RESET}\n"
 }
 
 progress_bar() {
@@ -67,21 +67,21 @@ step_start() {
 
 step_done() {
   local label="$1"
-  printf "\r\033[K${C_GREEN}✔${C_RESET} [%d/%d] %s\n" "$CURRENT_STEP" "$TOTAL_STEPS" "$label"
+  printf "\r\033[K${C_GREEN}[OK]${C_RESET} [%d/%d] %s\n" "$CURRENT_STEP" "$TOTAL_STEPS" "$label"
 }
 
 step_skip() {
   local label="$1"
-  printf "\r\033[K${C_BLUE}•${C_RESET} [%d/%d] %s ${C_DIM}(já instalado)${C_RESET}\n" "$CURRENT_STEP" "$TOTAL_STEPS" "$label"
+  printf "\r\033[K${C_BLUE}[--]${C_RESET} [%d/%d] %s ${C_DIM}(ja instalado)${C_RESET}\n" "$CURRENT_STEP" "$TOTAL_STEPS" "$label"
 }
 
 step_fail() {
   local label="$1"
-  printf "\r\033[K${C_RED}✘${C_RESET} [%d/%d] %s ${C_DIM}(falhou — veja %s)${C_RESET}\n" "$CURRENT_STEP" "$TOTAL_STEPS" "$label" "$LOG_FILE"
+  printf "\r\033[K${C_RED}[XX]${C_RESET} [%d/%d] %s ${C_DIM}(falhou - veja %s)${C_RESET}\n" "$CURRENT_STEP" "$TOTAL_STEPS" "$label" "$LOG_FILE"
 }
 
 run_quiet() {
-  # roda um comando redirecionando saída pro log, mantendo o terminal limpo
+  # roda um comando redirecionando saida pro log, mantendo o terminal limpo
   eval "$1" >>"$LOG_FILE" 2>&1
 }
 
@@ -98,8 +98,8 @@ snap_installed() { snap list 2>/dev/null | grep -q "^$1 "; }
 # ============================================================
 banner
 
-# ---------- 1. Dependências base ----------
-step_start "Verificando dependências do sistema"
+# ---------- 1. Dependencias base ----------
+step_start "Verificando dependencias do sistema"
 DEPS=(curl wget gpg ca-certificates apt-transport-https software-properties-common desktop-file-utils)
 MISSING_DEPS=()
 for d in "${DEPS[@]}"; do
@@ -107,13 +107,13 @@ for d in "${DEPS[@]}"; do
 done
 
 if [[ ${#MISSING_DEPS[@]} -eq 0 ]]; then
-  step_done "Dependências do sistema"
+  step_done "Dependencias do sistema"
 else
   run_quiet "$SUDO apt-get update -y"
   if run_quiet "$SUDO apt-get install -y ${MISSING_DEPS[*]}"; then
-    step_done "Dependências instaladas: ${MISSING_DEPS[*]}"
+    step_done "Dependencias instaladas: ${MISSING_DEPS[*]}"
   else
-    step_fail "Dependências do sistema"
+    step_fail "Dependencias do sistema"
     exit 1
   fi
 fi
@@ -144,7 +144,7 @@ else
 fi
 
 # ---------- 4. Unity Hub ----------
-step_start "Configurando repositório Unity Hub"
+step_start "Configurando repositorio Unity Hub"
 UNITY_KEYRING="/etc/apt/keyrings/unityhub.gpg"
 UNITY_LIST="/etc/apt/sources.list.d/unityhub.list"
 if [[ ! -f "$UNITY_LIST" ]]; then
@@ -164,8 +164,40 @@ else
   fi
 fi
 
-# ---------- 5. Antigravity IDE ----------
-step_start "Configurando repositório Antigravity"
+# ---------- 5. Compatibilidade Unity Editor (libxml2 legado) ----------
+# O Unity Editor (varias versoes 6000.x) e linkado contra a ABI antiga
+# libxml2.so.2, que nao existe mais em distros recentes (Ubuntu 25.04+,
+# Debian 13+, Fedora recentes) que ja migraram para libxml2.so.16.
+# Sem isso o Editor morre silenciosamente ao abrir um projeto, sem
+# nenhum erro visivel no Hub.
+step_start "Aplicando compatibilidade libxml2 para o Unity Editor"
+LIBXML2_OLD="/usr/lib/x86_64-linux-gnu/libxml2.so.2"
+LIBXML2_NEW=""
+for candidate in \
+  /usr/lib/x86_64-linux-gnu/libxml2.so.16 \
+  /usr/lib/x86_64-linux-gnu/libxml2.so \
+  /usr/lib64/libxml2.so.16 \
+  /usr/lib64/libxml2.so \
+  /lib/x86_64-linux-gnu/libxml2.so.16 \
+  /usr/lib/libxml2.so.16
+do
+  [[ -f "$candidate" ]] && LIBXML2_NEW="$candidate" && break
+done
+
+if [[ -e "$LIBXML2_OLD" ]]; then
+  step_skip "Compatibilidade libxml2"
+elif [[ -n "$LIBXML2_NEW" ]]; then
+  if run_quiet "$SUDO ln -sf $LIBXML2_NEW $LIBXML2_OLD && $SUDO ldconfig"; then
+    step_done "Symlink libxml2.so.2 -> $(basename "$LIBXML2_NEW") criado"
+  else
+    step_fail "Compatibilidade libxml2"
+  fi
+else
+  step_fail "Compatibilidade libxml2 (libxml2 nao encontrada no sistema)"
+fi
+
+# ---------- 6. Antigravity IDE ----------
+step_start "Configurando repositorio Antigravity"
 AG_KEYRING="/usr/share/keyrings/google-antigravity.gpg"
 AG_SOURCES="/etc/apt/sources.list.d/google-antigravity.sources"
 if [[ ! -f "$AG_SOURCES" ]]; then
@@ -184,7 +216,7 @@ else
   fi
 fi
 
-# ---------- 6. JetBrains Rider ----------
+# ---------- 7. JetBrains Rider ----------
 step_start "Instalando Rider (snap)"
 run_quiet "$SUDO systemctl enable --now snapd.socket"
 if snap_installed rider; then
@@ -197,8 +229,8 @@ else
   fi
 fi
 
-# ---------- 7. GitHub Desktop Plus ----------
-step_start "Configurando repositório GitHub Desktop Plus"
+# ---------- 8. GitHub Desktop Plus ----------
+step_start "Configurando repositorio GitHub Desktop Plus"
 GHDP_KEYRING="/usr/share/keyrings/polrivero.gpg"
 GHDP_LIST="/etc/apt/sources.list.d/github-desktop-plus.list"
 if [[ ! -f "$GHDP_LIST" ]]; then
@@ -220,6 +252,6 @@ fi
 # ============================================================
 echo
 hr
-echo -e "${C_GREEN}${C_BOLD} Instalação concluída.${C_RESET} ${C_DIM}Log completo em: $LOG_FILE${C_RESET}"
+echo -e "${C_GREEN}${C_BOLD} Instalacao concluida.${C_RESET} ${C_DIM}Log completo em: $LOG_FILE${C_RESET}"
 hr
 echo
