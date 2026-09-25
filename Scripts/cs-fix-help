@@ -1,0 +1,2 @@
+put this command on csgo steam: 
+SDL_VIDEO_DRIVER=wayland %command%
