@@ -1,0 +1,201 @@
+#!/bin/bash
+
+# ==================================================
+#  yt-download — interface amigavel para o yt-dlp
+#  tema: gruvbox (laranja)
+# ==================================================
+
+# ==== CONFIG ====
+DL_DIR="$HOME/Downloads"
+YTDLP="yt-dlp"
+# ================
+
+# ---- Cores (gruvbox) ----
+ORANGE='\033[38;5;208m'
+ORANGE_BR='\033[38;5;214m'
+YELLOW='\033[38;5;214m'
+GREEN='\033[38;5;142m'
+RED='\033[38;5;167m'
+GRAY='\033[38;5;245m'
+FG='\033[38;5;223m'
+BOLD='\033[1m'
+DIM='\033[2m'
+RESET='\033[0m'
+
+URL="$1"
+
+# ---- helpers visuais ----
+
+limpar() {
+    printf "\033[2J\033[H"
+}
+
+linha() {
+    printf "${ORANGE}${DIM}──────────────────────────────────────────────${RESET}\n"
+}
+
+banner() {
+    printf "${ORANGE}${BOLD}"
+    cat <<'EOF'
+   __   ______      ________ _  _  ___  _  __
+  \ \ / /_   _|    |  ____  | || |/ _ \| |/ /
+   \ V /  | |______| |    | | || | | | | ' /
+    \ /   | |______| |    | |__   |_| |  <
+     |    |_|      |______|    \____/|_|\_\
+EOF
+    printf "${RESET}"
+    printf "  ${GRAY}baixador de video/audio via yt-dlp${RESET}\n"
+    linha
+}
+
+erro() {
+    printf "${RED}${BOLD}✗ %s${RESET}\n" "$1"
+}
+
+ok() {
+    printf "${GREEN}✓ %s${RESET}\n" "$1"
+}
+
+info() {
+    printf "${ORANGE_BR}➜ %s${RESET}\n" "$1"
+}
+
+checar_dependencias() {
+    if ! command -v "$YTDLP" &>/dev/null; then
+        erro "yt-dlp nao encontrado no PATH."
+        printf "  ${GRAY}instale com: pip install -U yt-dlp${RESET}\n"
+        exit 1
+    fi
+}
+
+salvar_url() {
+    if [[ -z "$URL" ]]; then
+        printf "${ORANGE}➤ Cole a URL do video: ${RESET}"
+        read -r URL
+    fi
+    if [[ -z "$URL" ]]; then
+        erro "URL vazia. Saindo."
+        exit 1
+    fi
+}
+
+mostrar_titulo() {
+    local titulo
+    printf "${GRAY}buscando informacoes do video...${RESET}\r"
+    titulo=$(timeout 10 "$YTDLP" --no-playlist --skip-download --print "%(title)s" "$URL" 2>/dev/null)
+    printf "\033[2K"
+    if [[ -n "$titulo" ]]; then
+        printf "${FG}${BOLD}%s${RESET}\n" "$titulo"
+    else
+        printf "${GRAY}(nao foi possivel obter o titulo agora — seguindo em frente)${RESET}\n"
+    fi
+    linha
+}
+
+cabecalho_download() {
+    limpar
+    banner
+    printf "${GRAY}URL:${RESET}      %s\n" "$URL"
+    printf "${GRAY}Destino:${RESET}  %s\n" "$DL_DIR"
+    linha
+    mkdir -p "$DL_DIR"
+}
+
+baixar() {
+    local tipo="$1"
+
+    cabecalho_download
+
+    case "$tipo" in
+        video)
+            info "Baixando VIDEO (ate 1080p, mp4)..."
+            echo
+            $YTDLP -f "bv*[height<=1080]+ba/b[height<=1080]" --merge-output-format mp4 \
+                --no-playlist -o "$DL_DIR/%(title)s.%(ext)s" \
+                --progress -P "$DL_DIR/tmp" "$URL"
+            ;;
+        video_max)
+            info "Baixando VIDEO (melhor qualidade disponivel, mp4)..."
+            echo
+            $YTDLP -f "bv*+ba/b" --merge-output-format mp4 \
+                --no-playlist -o "$DL_DIR/%(title)s.%(ext)s" \
+                --progress -P "$DL_DIR/tmp" "$URL"
+            ;;
+        audio)
+            info "Baixando AUDIO (mp3)..."
+            echo
+            $YTDLP -f "ba/b" -x --audio-format mp3 \
+                --no-playlist -o "$DL_DIR/%(title)s.%(ext)s" \
+                "$URL"
+            ;;
+        playlist)
+            info "Baixando PLAYLIST completa (mp4)..."
+            echo
+            $YTDLP -f "bv*+ba/b" --merge-output-format mp4 \
+                -o "$DL_DIR/%(playlist_title)s/%(playlist_index)s - %(title)s.%(ext)s" \
+                --progress -P "$DL_DIR/tmp" "$URL"
+            ;;
+        formatos)
+            info "Listando formatos disponiveis..."
+            echo
+            $YTDLP -F --no-playlist "$URL"
+            linha
+            printf "${ORANGE}➤ Digite o codigo do formato: ${RESET}"
+            read -r fmt
+            if [[ -n "$fmt" ]]; then
+                cabecalho_download
+                info "Baixando formato [$fmt]..."
+                echo
+                $YTDLP -f "$fmt" --no-playlist -o "$DL_DIR/%(title)s.%(ext)s" \
+                    --progress -P "$DL_DIR/tmp" "$URL"
+            else
+                erro "Codigo vazio. Cancelado."
+            fi
+            ;;
+    esac
+
+    echo
+    if [[ $? -eq 0 ]]; then
+        ok "Concluido!"
+    else
+        erro "Algo deu errado no download."
+    fi
+}
+
+menu() {
+    while true; do
+        limpar
+        banner
+        mostrar_titulo
+
+        printf "  ${ORANGE_BR}${BOLD}1${RESET}${FG} Video ${GRAY}(mp4, ate 1080p)${RESET}\n"
+        printf "  ${ORANGE_BR}${BOLD}2${RESET}${FG} Video ${GRAY}(mp4, melhor qualidade)${RESET}\n"
+        printf "  ${ORANGE_BR}${BOLD}3${RESET}${FG} Audio ${GRAY}(mp3)${RESET}\n"
+        printf "  ${ORANGE_BR}${BOLD}4${RESET}${FG} Playlist completa ${GRAY}(mp4)${RESET}\n"
+        printf "  ${ORANGE_BR}${BOLD}5${RESET}${FG} Escolher formato manualmente${RESET}\n"
+        printf "  ${ORANGE_BR}${BOLD}6${RESET}${FG} Trocar URL${RESET}\n"
+        printf "  ${ORANGE_BR}${BOLD}0${RESET}${FG} Sair${RESET}\n"
+        linha
+        printf "${ORANGE}➤ Escolha uma opcao: ${RESET}"
+        read -r opcao
+
+        case $opcao in
+            1) baixar video ;;
+            2) baixar video_max ;;
+            3) baixar audio ;;
+            4) baixar playlist ;;
+            5) baixar formatos ;;
+            6) URL=""; salvar_url ;;
+            0) printf "${ORANGE}Ate mais!${RESET}\n"; exit 0 ;;
+            *) erro "Opcao invalida."; sleep 1; continue ;;
+        esac
+
+        echo
+        printf "${GRAY}Pressione Enter para continuar...${RESET}"
+        read -r
+    done
+}
+
+checar_dependencias
+salvar_url
+menu

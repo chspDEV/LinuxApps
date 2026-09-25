@@ -1,0 +1,31 @@
+#!/bin/bash
+
+echo "[0%] Starting system maintenance..."
+
+echo "[10%] Checking missing repository keys..."
+MISSING_KEYS=$(sudo apt-get update 2>&1 | grep -o 'NO_PUBKEY [0-9A-F]\{16\}' | awk '{print $2}' | sort -u)
+
+if [ ! -z "$MISSING_KEYS" ]; then
+    for KEY in $MISSING_KEYS; do
+        echo "Adding missing key: $KEY"
+        curl -sL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x$KEY" | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/"$KEY".gpg
+    done
+fi
+
+echo "[30%] Configuring unpacked packages..."
+sudo dpkg --configure -a
+
+echo "[50%] Fixing broken dependencies..."
+sudo apt-get --fix-broken install -y
+
+echo "[70%] Updating package lists..."
+sudo apt-get update
+
+echo "[85%] Upgrading installed packages..."
+sudo apt-get upgrade -y
+
+echo "[95%] Removing orphan packages and cleaning cache..."
+sudo apt-get autoremove --purge -y
+sudo apt-get clean
+
+echo "[100%] Maintenance complete."

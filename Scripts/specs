@@ -1,0 +1,64 @@
+#!/bin/bash
+
+W=$(tput cols 2>/dev/null || echo 60)
+line() { printf '%.0s─' $(seq 1 "$W"); echo; }
+
+echo "\`\`\`"
+line
+echo " SYSTEM SPECS — $(date '+%d/%m/%Y %H:%M')"
+line
+echo
+echo "[SO]"
+if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    echo "  Distro:       $PRETTY_NAME"
+fi
+echo "  Kernel:       $(uname -r)"
+echo "  Arquitetura:  $(uname -m)"
+echo "  Uptime:       $(uptime -p 2>/dev/null | sed 's/up //')"
+echo
+
+echo "[CPU]"
+CPU_MODEL=$(LC_ALL=C lscpu | grep -m1 "^Model name:" | sed 's/^Model name:\s*//')
+if [ -z "$CPU_MODEL" ]; then
+    CPU_MODEL=$(grep -m1 "model name" /proc/cpuinfo | sed 's/^model name\s*:\s*//')
+fi
+CPU_CORES=$(nproc)
+echo "  Modelo:       $CPU_MODEL"
+echo "  Núcleos:      $CPU_CORES"
+echo
+
+echo "[GPU]"
+lspci -mm 2>/dev/null | grep -iE "vga|3d" | awk -F '"' '{printf "  %s %s\n", $4, $6}'
+echo
+
+echo "[MEMÓRIA (RAM)]"
+MEM_TOTAL_KB=$(grep MemTotal /proc/meminfo | awk '{print $2}')
+MEM_AVAIL_KB=$(grep MemAvailable /proc/meminfo | awk '{print $2}')
+MEM_USED_KB=$((MEM_TOTAL_KB - MEM_AVAIL_KB))
+to_gb() { awk -v kb="$1" 'BEGIN{printf "%.1fG", kb/1024/1024}'; }
+echo "  Total:        $(to_gb "$MEM_TOTAL_KB")"
+echo "  Usada:        $(to_gb "$MEM_USED_KB")"
+echo "  Livre:        $(to_gb "$MEM_AVAIL_KB")"
+echo
+
+echo "[DISCO]"
+LC_ALL=C df -h --output=source,size,used,avail,pcent,target -x tmpfs -x devtmpfs -x squashfs -x efivarfs 2>/dev/null | \
+    sed 's/^/  /'
+echo
+
+echo "[REDE]"
+IP_LOCAL=$(hostname -I 2>/dev/null | awk '{print $1}')
+echo "  IP local:     $IP_LOCAL"
+echo
+
+echo "[GPU DRIVER (NVIDIA, se houver)]"
+if command -v nvidia-smi >/dev/null 2>&1; then
+    nvidia-smi --query-gpu=driver_version,name,memory.total --format=csv,noheader | \
+        awk -F', ' '{print "  Driver:       " $1; print "  Placa:        " $2; print "  VRAM:         " $3}'
+else
+    echo "  nvidia-smi não encontrado"
+fi
+
+line
+echo "\`\`\`"
