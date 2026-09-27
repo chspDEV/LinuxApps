@@ -1,0 +1,4 @@
+#!/bin/bash
+
+sleep 10
+systemctl --user restart pipewire.service pipewire-pulse.service wireplumber.service
