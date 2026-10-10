@@ -1,0 +1,46 @@
+1. Como descobrir como o aplicativo foi instalado no Linux
+No Linux, a maioria dos aplicativos (como o GitHub Desktop ou GitHub Desktop Plus) é instalada por um destes 4 métodos principais.
+
+Abra o terminal e execute os comandos abaixo para descobrir em qual formato ele está:
+
+============================= // =============================
+
+Opção A: Flatpak (Muito comum em distribuições modernas)
+Para verificar se foi instalado via Flatpak:
+
+bash
+flatpak list | grep -i github
+Se aparecer na lista, para desinstalar execute:
+bash
+flatpak uninstall io.github.shiftkey.github-desktop
+(Ou use o nome exato que o comando flatpak list mostrar).
+
+============================= // =============================
+
+Opção B: Pacote .deb (dpkg / apt)
+Para verificar se foi instalado via gerenciador de pacotes .deb ou repositório apt:
+
+bash
+dpkg -l | grep -i github
+Se aparecer na lista, para desinstalar execute:
+bash
+sudo apt remove github-desktop
+
+============================= // =============================
+
+Opção C: Snap
+Para verificar se foi instalado via Snap Store:
+
+bash
+snap list | grep -i github
+Se aparecer na lista, para desinstalar execute:
+bash
+sudo snap remove github-desktop
+
+============================= // =============================
+
+Opção D: AppImage
+Se não aparecer em nenhum dos comandos acima, ele provavelmente é um arquivo .AppImage que você baixou e executou direto.
+
+Procure na sua pasta Downloads, Imagens, Applications ou na sua pasta de usuário ~/.local/share/applications.
+Para desinstalar, basta deletar o arquivo .AppImage.
