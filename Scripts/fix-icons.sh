@@ -173,14 +173,201 @@ update_caches() {
   command -v kbuildsycoca5 >/dev/null && kbuildsycoca5 >/dev/null 2>&1
 }
 
+slug() {
+  tr 'A-Z' 'a-z' <<<"$1" | sed -E 's/[^a-z0-9]+/-/g; s/^-+|-+$//g'
+}
+
+install_icon() {
+  local src="$1" name="$2" ext
+  [ -f "$src" ] || return 1
+  ext="${src##*.}"
+  case "$ext" in png|svg|svgz|xpm) ;; *) ext="png" ;; esac
+  mkdir -p "$USER_ICONS/custom"
+  cp "$src" "$USER_ICONS/custom/$name.$ext"
+  echo "$USER_ICONS/custom/$name.$ext"
+}
+
+write_desktop() {
+  local file="$1" name="$2" exec_line="$3" icon="$4" wmclass="$5" hidden="${6:-0}"
+  {
+    echo "[Desktop Entry]"
+    echo "Type=Application"
+    echo "Name=$name"
+    echo "Exec=$exec_line"
+    echo "Icon=$icon"
+    echo "Terminal=false"
+    [ -n "$wmclass" ] && echo "StartupWMClass=$wmclass"
+    [ "$hidden" = 1 ] && echo "NoDisplay=true"
+  } > "$USER_APPS/$file"
+  FIXED=$((FIXED + 1))
+  echo "criado: $file"
+}
+
+asset_hash() {
+  python3 - "$1" <<'PY' 2>/dev/null
+import json, sys
+objs = json.load(open(sys.argv[1])).get("objects", {})
+for k in ("icons/icon_256x256.png", "minecraft/icons/icon_256x256.png", "icons/icon_128x128.png", "icons/icon_32x32.png"):
+    if k in objs:
+        print(objs[k]["hash"])
+        break
+PY
+}
+
+minecraft_icon() {
+  local idx h
+  for idx in "$HOME"/.minecraft/assets/indexes/*.json; do
+    [ -f "$idx" ] || continue
+    h=$(asset_hash "$idx")
+    if [ -n "$h" ] && [ -f "$HOME/.minecraft/assets/objects/${h:0:2}/$h" ]; then
+      echo "$HOME/.minecraft/assets/objects/${h:0:2}/$h"
+      return
+    fi
+  done
+  find "$HOME/.minecraft" -iname 'icon_*.png' 2>/dev/null | head -n1
+}
+
+jar_icon() {
+  local jar="$1" entry tmp
+  command -v unzip >/dev/null || return
+  entry=$(unzip -Z1 "$jar" 2>/dev/null | grep -iE '(icon|logo)[^/]*\.png$' | head -n1)
+  [ -z "$entry" ] && return
+  tmp=$(mktemp -d)
+  unzip -qo "$jar" "$entry" -d "$tmp" 2>/dev/null
+  echo "$tmp/$entry"
+}
+
+setup_tlauncher() {
+  local jar mc_icon icon launcher_icon launcher v n
+  jar=$(find "$HOME" /opt -maxdepth 5 -iname 'TLauncher*.jar' 2>/dev/null | head -n1)
+  if [ -z "$jar" ]; then
+    echo "TLauncher.jar não encontrado"
+    return
+  fi
+  launcher="java -jar \"$jar\""
+  mc_icon=$(minecraft_icon)
+  icon="$FALLBACK"
+  [ -n "$mc_icon" ] && icon=$(install_icon "$mc_icon" minecraft)
+  launcher_icon=$(jar_icon "$jar")
+  if [ -n "$launcher_icon" ]; then
+    launcher_icon=$(install_icon "$launcher_icon" tlauncher)
+  else
+    launcher_icon="$icon"
+  fi
+  write_desktop tlauncher.desktop "TLauncher" "$launcher" "$launcher_icon" "" 0
+  [ -d "$HOME/.minecraft/versions" ] || return
+  while read -r v; do
+    [ -z "$v" ] && continue
+    write_desktop "minecraft-$(slug "$v").desktop" "Minecraft $v" "$launcher" "$icon" "Minecraft* $v" 1
+  done < <(
+    for d in "$HOME"/.minecraft/versions/*/; do
+      [ -d "$d" ] || continue
+      v=$(basename "$d")
+      echo "$v"
+      n=$(grep -oE '^[0-9]+\.[0-9]+(\.[0-9]+)?' <<<"$v")
+      [ -n "$n" ] && echo "$n"
+    done | sort -u
+  )
+}
+
+setup_eclipse() {
+  local bin dir icon
+  bin=$(find "$HOME" /opt /usr/lib -maxdepth 4 -type f -name eclipse -perm -u+x 2>/dev/null | head -n1)
+  if [ -z "$bin" ]; then
+    echo "Eclipse não encontrado"
+    return
+  fi
+  dir=$(dirname "$bin")
+  icon=$(find "$dir/plugins" -maxdepth 3 -iname 'eclipse*.png' 2>/dev/null | sort -V | tail -n1)
+  [ -z "$icon" ] && icon=$(find "$dir" -maxdepth 1 -name 'icon.xpm' | head -n1)
+  if [ -n "$icon" ]; then
+    icon=$(install_icon "$icon" eclipse)
+  else
+    icon="$FALLBACK"
+  fi
+  write_desktop eclipse.desktop "Eclipse IDE" "\"$bin\"" "$icon" "Eclipse" 0
+}
+
+setup_unity() {
+  local ed icon
+  ed=$(find "$HOME/Unity/Hub/Editor" -maxdepth 3 -type f -name Unity -perm -u+x 2>/dev/null | sort -V | tail -n1)
+  [ -z "$ed" ] && ed=$(find "$HOME" /opt -maxdepth 6 -type f -name Unity -perm -u+x 2>/dev/null | sort -V | tail -n1)
+  if [ -z "$ed" ]; then
+    echo "Unity Editor não encontrado"
+    return
+  fi
+  icon=$(find "$(dirname "$ed")/Data" -maxdepth 3 -iname '*unity*.png' 2>/dev/null | sort -V | tail -n1)
+  if [ -n "$icon" ]; then
+    icon=$(install_icon "$icon" unity-editor)
+  elif has_icon unityhub; then
+    icon="unityhub"
+  else
+    icon="$FALLBACK"
+  fi
+  write_desktop unity-editor.desktop "Unity Editor" "\"$ed\"" "$icon" "Unity" 0
+}
+
+exec_from_pid() {
+  local a out=""
+  while IFS= read -r -d '' a; do
+    a=${a//\"/\\\"}
+    a=${a//%/%%}
+    out+="\"$a\" "
+  done < "/proc/$1/cmdline"
+  echo "${out% }"
+}
+
+fix_windows() {
+  if ! command -v xprop >/dev/null; then
+    echo "xprop não encontrado (instale x11-utils)"
+    return
+  fi
+  local known ids id cls pid cmd sl m c exe icon d skip
+  known=$(mktemp)
+  grep -rh '^StartupWMClass=' "${APP_DIRS[@]}" 2>/dev/null | cut -d= -f2- | sort -u > "$known"
+  ids=$(xprop -root _NET_CLIENT_LIST 2>/dev/null | grep -o '0x[0-9a-fA-F]*')
+  for id in $ids; do
+    cls=$(xprop -id "$id" WM_CLASS 2>/dev/null | sed -E 's/.*= *"[^"]*", *"(.*)"/\1/')
+    [ -z "$cls" ] && continue
+    grep -Fxiq -- "$cls" "$known" && continue
+    skip=0
+    for d in "${APP_DIRS[@]}"; do
+      [ -f "$d/$cls.desktop" ] || [ -f "$d/${cls,,}.desktop" ] && skip=1
+    done
+    [ "$skip" = 1 ] && continue
+    pid=$(xprop -id "$id" _NET_WM_PID 2>/dev/null | awk '{print $3}')
+    [ -r "/proc/${pid:-0}/cmdline" ] || continue
+    cmd=$(exec_from_pid "$pid")
+    [ -z "$cmd" ] && continue
+    sl=$(slug "$cls")
+    exe=$(basename "$(tr '\0' '\n' < "/proc/$pid/cmdline" | head -n1)")
+    icon=""
+    for c in "$cls" "$sl" "${cls,,}" "$exe"; do
+      m=$(grep -Fxi -m1 -- "$c" "$INDEX")
+      [ -n "$m" ] && { icon="$m"; break; }
+    done
+    [ -z "$icon" ] && icon="$FALLBACK"
+    write_desktop "janela-$sl.desktop" "$cls" "$cmd" "$icon" "$cls" 0
+    echo "$cls" >> "$known"
+  done
+  rm -f "$known"
+}
+
 main() {
-  local with_appimages=0
-  [ "${1:-}" = "--appimages" ] && with_appimages=1
+  local arg with_appimages=0 with_windows=0
+  for arg in "$@"; do
+    [ "$arg" = "--appimages" ] && with_appimages=1
+    [ "$arg" = "--janelas" ] && with_windows=1
+  done
   mkdir -p "$USER_APPS" "$USER_ICONS"
   install_pkgs
   update_caches
   build_index
   fix_all_desktops
+  setup_tlauncher
+  setup_eclipse
+  setup_unity
+  [ "$with_windows" -eq 1 ] && fix_windows
   [ "$with_appimages" -eq 1 ] && integrate_appimages
   update_caches
   rm -f "$INDEX"
@@ -188,4 +375,4 @@ main() {
   echo "faça logout/login para o shell recarregar os ícones"
 }
 
-main "$@"
+[ "${BASH_SOURCE[0]}" = "$0" ] && main "$@"
